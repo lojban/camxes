@@ -27,7 +27,6 @@ PUBLIC text <- intro-null NAI-clause* text-part-2 (!text-1 joik-jek)? text-1? fa
 intro-null <- spaces? su-clause* intro-si-clause
 text-part-2 <- (CMENE-clause+ / indicators?) free*
 
-;; SPACE intro-sa-clause <- SA-clause+ / any-word-SA-handling !(ZEI-clause SA-clause) intro-sa-clause
 SPACE intro-si-clause <- si-clause? SI-clause*
 SPACE faho-clause <- (FAhO-clause dot-star)?
 
@@ -51,8 +50,6 @@ statement-3 <- sentence / tag? TUhE-clause free* text-1 TUhU-clause? free*
 fragment <- prenex / terms VAU-clause? free* / ek free* / gihek free* / quantifier / NA-clause !JA-clause free* / relative-clauses / links / linkargs
 
 prenex <- terms ZOhU-clause free*
-
-;; sentence <- (terms CU-clause? free*)? bridi-tail / bridi-tail
 
 sentence <- (terms bridi-tail-sa* CU-clause? free*)? bridi-tail-sa* bridi-tail
 
@@ -80,10 +77,6 @@ tail-terms <- terms? VAU-clause? free*
 
 terms <- terms-1+
 
-;; terms-1 <- terms-2 (PEhE-clause free* joik-jek terms-2)*
-
-;; terms-2 <- term (CEhE-clause free* term)*
-
 terms-1 <- terms-2 (pehe-sa* PEhE-clause free* joik-jek terms-2)*
 
 terms-2 <- term (cehe-sa* CEhE-clause free* term)*
@@ -91,8 +84,6 @@ terms-2 <- term (cehe-sa* CEhE-clause free* term)*
 SPACE pehe-sa <- PEhE-clause (!PEhE-clause (sa-word / SA-clause !PEhE-clause))* SA-clause
 
 SPACE cehe-sa <- CEhE-clause (!CEhE-clause (sa-word / SA-clause !CEhE-clause))* SA-clause
-
-;;term <- sumti / ( !gek (tag / FA-clause free*) (sumti / KU-clause? free*) ) / termset / NA-clause KU-clause free*
 
 term <- term-sa* term-1
 
@@ -129,8 +120,6 @@ sumti-tail <- (sumti-6 relative-clauses?)? sumti-tail-1 / relative-clauses sumti
 sumti-tail-1 <- selbri relative-clauses? / quantifier selbri relative-clauses? / quantifier sumti
 
 relative-clauses <- relative-clause (ZIhE-clause free* relative-clause)*
-
-;; relative-clause <- GOI-clause free* term GEhU-clause? free* / NOI-clause free* subsentence KUhO-clause? free*
 
 relative-clause <- relative-clause-sa* relative-clause-1
 
@@ -171,8 +160,6 @@ SPACE linkargs-sa <- linkargs-start (!linkargs-start (sa-word / SA-clause !linka
 
 linkargs-start <- BE-clause
 
-;; links <- BEI-clause free* term links?
-
 links <- links-sa* links-1
 
 links-1 <- BEI-clause free* term links?
@@ -182,8 +169,6 @@ SPACE links-sa <- links-start (!links-start (sa-word / SA-clause !links-start ) 
 links-start <- BEI-clause
 
 quantifier <- number !MOI-clause BOI-clause? free* / VEI-clause free* mex VEhO-clause? free*
-
-;;mex <- mex-1 (operator mex-1)* / rp-clause
 
 mex <- mex-sa* mex-0
 
@@ -213,8 +198,6 @@ fore-operands <- mex-2+
 rp-expression <- operand rp-expression-tail
 rp-expression-tail <- rp-expression operator rp-expression-tail / ()
 
-;; operator <- operator-1 (joik-jek operator-1 / joik stag? KE-clause free* operator KEhE-clause? free*)*
-
 operator <- operator-sa* operator-0
 
 operator-0 <- operator-1 (joik-jek operator-1 / joik stag? KE-clause free* operator KEhE-clause? free*)*
@@ -228,8 +211,6 @@ operator-1 <- operator-2 / guhek operator-1 gik operator-2 / operator-2 (jek / j
 operator-2 <- mex-operator / KE-clause free* operator KEhE-clause? free*
 
 mex-operator <- SE-clause free* mex-operator / NAhE-clause free* mex-operator / MAhO-clause free* mex TEhU-clause? free* / NAhU-clause free* selbri TEhU-clause? free* / VUhU-clause free*
-
-;; operand <- operand-1 (joik-ek stag? KE-clause free* operand KEhE-clause? free*)?
 
 operand <- operand-sa* operand-0
 
@@ -254,7 +235,6 @@ lerfu-word <- BY-clause / LAU-clause lerfu-word / TEI-clause lerfu-string FOI-cl
 
 ek <- NA-clause? SE-clause? A-clause NAI-clause?
 
-;; gihek <- NA-clause? SE-clause? GIhA-clause NAI-clause?
 gihek <- gihek-sa* gihek-1
 
 gihek-1 <- NA-clause? SE-clause? GIhA-clause NAI-clause?
@@ -267,7 +247,6 @@ joik <- SE-clause? JOI-clause NAI-clause? / interval / GAhO-clause interval GAhO
 
 interval <- SE-clause? BIhI-clause NAI-clause?
 
-;; joik-ek <- joik free* / ek free*
 joik-ek <- joik-ek-sa* joik-ek-1
 
 joik-ek-1 <- (joik free* / ek free*)
