@@ -87,7 +87,7 @@ SPACE cehe-sa <- CEhE-clause (!CEhE-clause (sa-word / SA-clause !CEhE-clause))* 
 
 term <- term-sa* term-1
 
-term-1 <- sumti / ( !gek (tag / FA-clause free*) (sumti / KU-clause? free*) ) / termset / NA-clause KU-clause free*
+term-1 <- sumti / !gek (tag / FA-clause free*) (sumti / KU-clause? free*) / termset / NA-clause KU-clause free*
 
 SPACE term-sa <- term-start (!term-start (sa-word / SA-clause !term-start ) )* SA-clause &term-1
 
