@@ -292,7 +292,7 @@ vocative <- ( COI-clause NAI-clause? )* DOI-clause / ( COI-clause NAI-clause? )+
 
 indicators <- FUhE-clause? indicator+
 
-indicator <-  ((UI-clause / CAI-clause) NAI-clause? / DAhO-clause / FUhO-clause) !BU-clause
+indicator <- ((UI-clause / CAI-clause) NAI-clause? / DAhO-clause / FUhO-clause) !BU-clause
 
 
 ; ****************
