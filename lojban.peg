@@ -115,7 +115,7 @@ sumti-6 <- ZO-clause free* / ZOI-clause free* / LOhU-clause free* / lerfu-string
 
 sumti-tail <- (sumti-6 relative-clauses?)? sumti-tail-1 / relative-clauses sumti-tail-1
 
-sumti-tail-1 <- selbri relative-clauses? / quantifier selbri relative-clauses? / quantifier sumti
+sumti-tail-1 <- quantifier? selbri relative-clauses? / quantifier sumti
 
 relative-clauses <- relative-clause (ZIhE-clause free* relative-clause)*
 
