@@ -278,7 +278,7 @@ space <- VA-clause space-offset* space-interval? (MOhI-clause space-offset)? / V
 
 space-offset <- FAhA-clause NAI-clause? VA-clause?
 
-space-interval <- (VEhA-clause / VIhA-clause / VEhA-clause VIhA-clause) (FAhA-clause NAI-clause?)? space-int-props / (VEhA-clause / VIhA-clause / VEhA-clause VIhA-clause) (FAhA-clause NAI-clause?)? / space-int-props
+space-interval <- (VEhA-clause / VIhA-clause / VEhA-clause VIhA-clause) (FAhA-clause NAI-clause?)? space-int-props? / space-int-props
 
 space-int-props <- (FEhE-clause interval-property)+
 
