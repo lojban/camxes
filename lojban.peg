@@ -268,7 +268,7 @@ stag <- simple-tense-modal ((jek / joik) simple-tense-modal)* / tense-modal (joi
 
 tense-modal <- simple-tense-modal free* / FIhO-clause free* selbri FEhU-clause? free*
 
-simple-tense-modal <- NAhE-clause? SE-clause? BAI-clause NAI-clause? KI-clause? / NAhE-clause? ( ((time space? / space time?) CAhA-clause) / (time space? / space time?) / CAhA-clause ) KI-clause? / KI-clause / CUhE-clause
+simple-tense-modal <- NAhE-clause? SE-clause? BAI-clause NAI-clause? KI-clause? / NAhE-clause? ( (time space? / space time?) CAhA-clause / (time space? / space time?) / CAhA-clause ) KI-clause? / KI-clause / CUhE-clause
 
 time <- ZI-clause time-offset* (ZEhA-clause (PU-clause NAI-clause?)?)? interval-property* / ZI-clause? time-offset+ (ZEhA-clause (PU-clause NAI-clause?)?)? interval-property* / ZI-clause? time-offset* ZEhA-clause (PU-clause NAI-clause?)? interval-property* / ZI-clause? time-offset* (ZEhA-clause (PU-clause NAI-clause?)?)? interval-property+
 
