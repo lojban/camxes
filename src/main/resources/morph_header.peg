@@ -1,0 +1,21 @@
+; --- General Morphology ---
+
+; Ignore the -morph bits here if searching for these non-terminals.
+;; out of date: BU is before spaces in front so we can catch Y + BU before anything else.
+PUBLIC morphology <- initial-spaces-morph? ( ( CMAVO-morph / BRIVLA-morph / CMENE-morph / non-lojban-word-morph ) spaces-morph?)*
+
+; morphology <- (BU-clause-morph / spaces-morph)* (any-word-morph spaces-morph?)* EOF-morph
+
+; --- MORPHOLOGY FILE ---
+; Do *NOT* delete the line above!
+
+;         any single lexable Lojban words
+;any-word <- CMAVO / BRIVLA / CMENE / non-lojban-word
+
+CMENE <- cmene
+BRIVLA <- gismu / lujvo / fuhivla
+;CMAVO <- !A !BAI !BAhE !BE !BEI !BEhO !BIhE !BIhI !BO !BOI !BU !BY !CAhA !CAI !CEI !CEhE !CO !COI !CU !CUhE !DAhO !DOI !DOhU !FA !FAhA !FAhO !FEhE !FEhU !FIhO !FOI !FUhA !FUhE !FUhO !GA !GAhO !GEhU !GI !GIhA !GOI !GOhA !GUhA !I !JA !JAI !JOhI !JOI !KE !KEhE !KEI !KI !KOhA !KU !KUhE !KUhO !LA !LAU !LAhE !LE !LEhU !LI !LIhU !LOhO !LOhU !LU !LUhU !MAhO !MAI !ME !MEhU !MOhE !MOhI !MOI !NA !NAI !NAhE !NAhU !NIhE !NIhO !NOI !NU !NUhA !NUhI !NUhU !PA !PEhE !PEhO !PU !RAhO !ROI !SA !SE !SEI !SEhU !SI !SOI !SU !TAhE !TEhU !TEI !TO !TOI !TUhE !TUhU !UI !VA !VAU !VEI !VEhO !VUhU !VEhA !VIhA !VUhO !XI !ZAhO !ZEhA !ZEI !ZI !ZIhE !ZO !ZOI !ZOhU cmavo
+CMAVO <- A / BAI / BAhE / BE / BEI / BEhO / BIhE / BIhI / BO / BOI / BU / BY / CAhA / CAI / CEI / CEhE / CO / COI / CU / CUhE / DAhO / DOI / DOhU / FA / FAhA / FAhO / FEhE / FEhU / FIhO / FOI / FUhA / FUhE / FUhO / GA / GAhO / GEhU / GI / GIhA / GOI / GOhA / GUhA / I / JA / JAI / JOhI / JOI / KE / KEhE / KEI / KI / KOhA / KU / KUhE / KUhO / LA / LAU / LAhE / LE / LEhU / LI / LIhU / LOhO / LOhU / LU / LUhU / MAhO / MAI / ME / MEhU / MOhE / MOhI / MOI / NA / NAI / NAhE / NAhU / NIhE / NIhO / NOI / NU / NUhA / NUhI / NUhU / PA / PEhE / PEhO / PU / RAhO / ROI / SA / SE / SEI / SEhU / SI / SOI / SU / TAhE / TEhU / TEI / TO / TOI / TUhE / TUhU / UI / VA / VAU / VEI / VEhO / VUhU / VEhA / VIhA / VUhO / XI / ZAhO / ZEhA / ZEI / ZI / ZIhE / ZO / ZOI / ZOhU / cmavo
+
+; --- MORPHOLOGY ---
+

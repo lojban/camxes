@@ -1,0 +1,1524 @@
+module xtc.lang.lojban;
+
+//import xtc.lang.JavaIdentifier(xtc.lang.JavaSymbol, xtc.util.Spacing);
+//instantiate xtc.util.Symbol(xtc.util.Spacing);
+//import xtc.lang.JavaSymbol(xtc.util.Symbol);
+//import xtc.util.Spacing;
+
+header {
+    import java.io.Reader;
+    import java.io.BufferedReader;
+    import java.io.FileReader;
+    import java.io.IOException;
+    import java.io.StringReader;
+    import java.io.InputStreamReader;
+
+    import xtc.util.Pair;
+
+    import xtc.tree.GNode;
+    import xtc.tree.Printer;
+
+    import xtc.util.Utilities;
+    import xtc.tree.Attribute;
+    import xtc.tree.Printer;
+
+    import gnu.getopt.Getopt;
+
+    // Numerical data loading.
+    import java.util.HashMap;
+    import java.io.StreamTokenizer;
+    import java.util.Vector;
+
+    // These are from VFormat.java
+
+    import java.util.ArrayList;
+    import java.util.regex.Pattern;
+    import java.util.regex.Matcher;
+}
+
+body {
+
+    // Used for ZOI
+    public static String startString;
+    public static String startString2;
+
+    // Different types of output.
+    public static boolean parserParens = false;
+    public static boolean morphology = false;
+    public static boolean morphprint = false;
+    public static boolean whitespace = false;
+    public static boolean blanks = false;
+    public static boolean pretty = false;
+    public static boolean text = false;
+    public static boolean terml = false;
+    public static boolean verbose = false;
+    public static boolean latex = false;
+
+    public static HashMap mex_data;
+
+    public static void loadMexData()
+    {
+	try {
+	    FileReader f = new FileReader( "/home/rlpowell/www/hobbies/lojban/grammar/rats/mex.tsv" );
+	    Reader r = new BufferedReader( f );
+	    StreamTokenizer st = new StreamTokenizer(r);
+
+	    // Tokenizer setup.
+	    st.eolIsSignificant( true );
+	    st.wordChars( ' ', '~' );
+	    st.whitespaceChars( '	', '	' );
+	    st.quoteChar( '\"' );
+
+	    mex_data = new HashMap();
+
+	    int ttype;
+
+	    ttype = st.nextToken();
+
+	    while( ttype != java.io.StreamTokenizer.TT_EOF )
+	    {
+		String key;
+		String[] values;
+		values = new String[3];
+
+		int i = 0;
+
+		if( st.sval == null )
+		{
+		    key = Integer.toString( (int) st.nval );
+		} else {
+		    key = st.sval;
+		}
+
+		ttype = st.nextToken();
+
+		while( ttype != java.io.StreamTokenizer.TT_EOL && ttype != java.io.StreamTokenizer.TT_EOF )
+		{
+		    if( st.sval == null )
+		    {
+			values[i] = Integer.toString( (int) st.nval );
+		    } else {
+			values[i] = st.sval;
+		    }
+
+		System.out.println("mex val: " + values[i] );
+		    i++;
+
+		    ttype = st.nextToken();
+		}
+
+		System.out.println("mex data: " + key + "," + values[0] + "," + values[1] + "," + values[2] );
+		mex_data.put( key, values );
+
+		ttype = st.nextToken();
+	    }
+	} catch( java.io.FileNotFoundException e ) {
+	    System.out.println("mex data file not found.\n");
+	} catch( java.io.IOException e ) {
+	    System.out.println("mex data file io problems.\n");
+	}
+
+
+    }
+
+    public static boolean myAssign2 (String obj1)
+    {
+	startString2 = obj1;
+	//System.out.println("ssmyAssign;" + startString + ";");
+	return true;
+    }
+
+    public static boolean myCompare (String obj1, String obj2)
+    {
+	/*
+	System.out.println("obj1;" + obj1 + ";");
+	System.out.println("obj2;" + obj2 + ";");
+	System.out.println("comp;" + obj1.equals( obj2 ) + ";");
+	*/
+	return obj1.equals( obj2 );
+    }
+
+    public static boolean myAssign (String obj1)
+    {
+	startString = obj1;
+	//System.out.println("ssmyAssign;" + startString + ";");
+	return true;
+    }
+
+    public static String nonVerbose(
+	    String pre, String main,
+	    boolean outermost
+	    )
+    {
+	String retval;
+	//System.out.println( "nv pre: "+pre);
+	//System.out.println( "nv pre: "+main);
+
+	// We mark the first increase in nesting. If we get back to
+	// nest == 0 and see another increase, we have more than one
+	// child.
+	int nest=0;
+	boolean single = true;
+	boolean none = true;
+	boolean found_child = false;
+	for (int i=0; i<main.length(); i++) {
+	    char c = main.charAt(i);  // get character
+
+	    if( c == '(' )
+	    {
+		//System.out.println( "nv found paren: "+nest+", "+found_child+", "+none);
+
+		if( nest == 0 )
+		{
+		    if( found_child )
+		    {
+			single = false;		// We've seen a child; there must be more than one.
+		    } else {
+			found_child = true;	// Mark that we've seen one child
+		    }
+		}
+
+		none = false;	// We've seen at least one paren
+
+		nest++;  // incr nesting count
+	    }
+	    else if( c == ')' )
+	    {
+		none = false;	// We've seen at least one paren
+		nest--;  // decr nesting count
+	    }
+	}
+
+	if( single && ! outermost && ! none )
+	{
+	    //System.out.println( "nv one child." );
+	    // Only one child.
+	    retval = main;
+	} else {
+	    //System.out.println( "nv more than one child." );
+	    // More than one child.
+	    retval = " " + pre + "=( " + main + " ) ";
+	}
+
+	return retval;
+    }
+
+    public static String handleOperator(
+	    String op, Vector operands, String original
+	    )
+    {
+	String op_type;
+	String op_symbol;
+	String op_args;
+
+	if( mex_data.containsKey( op ) )
+	{
+	    op_type = ((String[]) mex_data.get( op ))[0];
+	    op_symbol = ((String[]) mex_data.get( op ))[1];
+	    op_args = ((String[]) mex_data.get( op ))[2];
+	} else {
+	    // ma'o-based or something; treat as inf.
+	    op_type = "func";
+	    op_symbol = op;
+	    op_args = "inf";
+	}
+
+	System.out.println( "op type: "+op_type);
+	System.out.println( "op symbol: "+op_symbol);
+	System.out.println( "op args: "+op_args);
+
+	if( op_type.equals( "regex" ) || op_type.equals( "regexsp" ) )
+	{
+	    // Strict number of arguments.
+	    if( op_symbol.matches( ".*\\$1.*" ) )
+	    {
+		int arg_num = 0;
+		String retval;
+
+		System.out.println( "Fixed args; op symbol: "+op_symbol);
+
+		// Extract highest arg.
+		Pattern pattern = Pattern.compile("\\$([0-9]+)");
+		Matcher matcher = pattern.matcher(op_symbol);
+
+		while( matcher.find() )
+		{
+		    String arg_num_str = matcher.group( 1 );
+
+		    System.out.println( "Fixed args; group: " + arg_num_str );
+
+		    if( arg_num < Integer.parseInt( arg_num_str ) )
+		    {
+			arg_num = Integer.parseInt( arg_num_str );
+		    }
+		}
+
+		System.out.println( "Fixed args; last arg: " + arg_num);
+
+		if( operands.size() != arg_num )
+		{
+		    return original;
+		}
+
+		// Fill the argument groupings.
+		retval = op_symbol;
+
+		String arg;
+
+		arg = ((String) operands.get( 0 ));
+
+		if( arg.matches( "^\\s*\\{.*" ) && arg.matches( ".*\\}\\s*$" ) )
+		{
+		    arg = arg.replaceAll( "^\\s*\\{", "" );
+		    arg = arg.replaceAll( "\\}\\s*$", "" );
+		}
+
+		retval = retval.replaceFirst( "\\$1", "####" );
+		retval = retval.split( "####" )[0] + arg + retval.split( "####" )[1];
+
+		System.out.println( "Fixed args first: " + retval);
+
+		for( int i=1; i < operands.size(); i++ )
+		{
+		    arg = ((String) operands.get( i ));
+
+		    if( arg.matches( "^\\s*\\{.*" ) && arg.matches( ".*\\}\\s*$" ) )
+		    {
+			arg = arg.replaceAll( "^\\s*\\{", "" );
+			arg = arg.replaceAll( "\\}\\s*$", "" );
+		    }
+
+		    retval = retval.replaceFirst( "\\$" + ( i + 1 ), "####" );
+		    retval = retval.split( "####" )[0] + arg + retval.split( "####" )[1];
+		    System.out.println( "Fixed args " + i + "th : " + retval);
+		}
+
+		System.out.println( "Fixed args out: " + retval);
+		return retval;
+	    // Mush all the args together
+	    } else if( op_symbol.matches( ".*\\$0.*" ) ) {
+		String retval, args;
+
+		args = ((String) operands.get( 0 ));
+
+		for( int i=1; i < operands.size(); i++ )
+		{
+		    if( op_type.equals( "regexsp" ) )
+		    {
+			args = args + " " + ((String) operands.get( i ));
+		    } else {
+			args = args + ((String) operands.get( i ));
+		    }
+		    System.out.println( "Mushed args " + i + "th : " + args);
+		}
+
+		retval = op_symbol;
+
+		retval = retval.replaceFirst( "\\$0", "####" );
+		retval = retval.split( "####" )[0] + args + retval.split( "####" )[1];
+
+		System.out.println( "Mushed args out: " + retval);
+		return retval;
+	    }
+	} else if( op_args.equals( "inf" ) ) {
+	    String retval = "";
+
+	    if( op_type.equals( "func" ) )
+	    {
+		retval = op_symbol + " { " + ((String) operands.get( 0 ) );
+
+		for( int i=1; i < operands.size(); i++ )
+		{
+		    retval = retval + " , " + ( (String) operands.get( i ) );
+		}
+
+		retval = retval + " } ";
+		System.out.println( "func out: "+retval);
+	    } else if( op_type.equals( "shifts" ) ) {
+		return original;
+	    } else if( op_type.equals( "join" ) ) {
+		System.out.println( "join in: "+original);
+
+		if( operands.size() < 2 )
+		{
+		    return original;
+		}
+
+		retval = ((String) operands.get( 0 ) );
+
+		for( int i=1; i < operands.size(); i++ )
+		{
+		    retval = retval + " " + op_symbol + " " + ( (String) operands.get( i ) );
+		}
+
+		System.out.println( "join out: "+retval);
+	    } else if( op_type.equals( "between" ) ) {
+		System.out.println( "between in: "+original);
+
+		if( operands.size() < 2 )
+		{
+		    return original;
+		}
+
+		retval = ((String) operands.get( 0 ) );
+
+		for( int i=1; i < operands.size(); i++ )
+		{
+		    retval = " { " + retval + " " + op_symbol + " " + ( (String) operands.get( i ) ) + " } ";
+		}
+
+		System.out.println( "between out: "+retval);
+	    }
+
+	    return " operand=( " + retval + " ) ";
+	} else if( op_args.equals( "2" ) ) {
+
+	    String retval;
+
+	    if( operands.size() != 2 )
+	    {
+		// return "Bad operands for " + op_type;
+		return original;
+	    }
+
+	    retval = ((String) operands.get( 0 ) );
+
+	    for( int i=1; i < operands.size(); i++ )
+	    {
+		retval = op_symbol + " !{" + retval + "}! !{ " + ( (String) operands.get( i ) ) + " }! ";
+
+		System.out.println( "retval: "+retval);
+	    }
+
+	    return " operand=( " + retval + " ) ";
+	} else if( op_args.equals( "1" ) ) {
+
+	    String retval;
+
+	    if( operands.size() != 1 )
+	    {
+		// return "Bad operands for " + op_type;
+		return original;
+	    }
+
+	    if( op_type.equals( "uponce" ) ) {
+		retval = ((String) operands.get( 0 ) );
+
+		return " operand=( " + retval.toUpperCase() + " ) ";
+	    } else if( op_type.equals( "LI" ) ) {
+		// Fix parens and such.
+		retval = ((String) operands.get( 0 ) );
+		System.out.println( "LI in: "+retval);
+
+		/*
+		if( retval.matches( ".*\\{\\s+\\{.*" ) && retval.matches( ".*\\}\\s+\\}.*" ) )
+		{
+		    retval = retval.replaceAll( "\\{\\s+\\{", "\\{" );
+		    retval = retval.replaceAll( "\\}\\s+\\}", "\\}" );
+		}
+		*/
+
+		if( retval.matches( "^\\s*\\{.*" ) && retval.matches( ".*\\}\\s*$" ) )
+		{
+		    retval = retval.replaceAll( "^\\s*\\{", "" );
+		    retval = retval.replaceAll( "\\}\\s*$", "" );
+		}
+
+		retval = " operand=( $ " + retval + " $ ) ";
+		System.out.println( "LI out: "+retval);
+
+		return retval;
+	    }
+	}
+
+	return op;
+    }
+
+    public static String handleShifts(
+	    String input
+	    )
+    {
+	String retval;
+
+	// Case shifts for latex mode.
+	boolean lerfu_upper_case = false;
+	boolean lerfu_upper_case_once = false;
+	boolean lerfu_greek = false;
+
+	System.out.println( "In shifts." );
+
+	retval = input;
+
+	// Extract operator.
+	Pattern pattern = Pattern.compile("(SHIFT|LETTER)([a-zA-Z']+)");
+	Matcher matcher = pattern.matcher(input);
+
+	if( matcher.find( ) )
+	{
+	    matcher.reset();
+
+	    while( matcher.find() )
+	    {
+		String type = matcher.group( 1 );
+		String arg = matcher.group( 2 );
+
+		System.out.println( "shifts type: " + type );
+		System.out.println( "shifts arg: " + arg );
+
+		if( type.equals( "SHIFT" ) )
+		{
+		    if( arg.equals( "upper" ) )
+		    {
+			lerfu_upper_case = true;
+			System.out.println( "shifts upcase." );
+			retval = retval.replaceFirst( type + arg, "" );
+		    } else if( arg.equals( "uponce" ) ) {
+			lerfu_upper_case_once = true;
+			System.out.println( "shifts uponce." );
+			retval = retval.replaceFirst( type + arg, "" );
+		    } else if( arg.equals( "greek" ) ) {
+			lerfu_greek = true;
+			System.out.println( "shifts greek." );
+			retval = retval.replaceFirst( type + arg, "" );
+		    } else if( arg.equals( "none" ) ) {
+			lerfu_greek = false;
+			lerfu_upper_case = false;
+			System.out.println( "shifts noshift." );
+			retval = retval.replaceFirst( type + arg, "" );
+		    }
+		} else {
+		    if( lerfu_upper_case )
+		    {
+			String[] upper_array = ( (String[])mex_data.get( "UPPER" + arg ) );
+			retval = retval.replaceFirst( type + arg, upper_array[1] );
+			System.out.println( "shifts new upcase: " + retval );
+		    } else if( lerfu_upper_case_once ) {
+			// End the upper case.
+			lerfu_upper_case_once = false;
+			String[] upper_array = ( (String[])mex_data.get( "UPPER" + arg ) );
+			retval = retval.replaceFirst( type + arg, upper_array[1] );
+			System.out.println( "shifts new upcase once: " + retval );
+		    } else if( lerfu_greek ) {
+			String[] upper_array = ( (String[])mex_data.get( "GREEK" + arg ) );
+			retval = retval.replaceFirst( type + arg, upper_array[1] );
+			System.out.println( "shifts new greek: " + retval );
+		    } else {
+			retval = retval.replaceFirst( type + arg, arg );
+			System.out.println( "shifts new none: " + retval );
+		    }
+		}
+	    }
+	}
+
+	System.out.println( "shifts out: "+retval);
+	return retval;
+    }
+
+    public static String handlePrefix(
+	    String main
+	    )
+    {
+	String retval = main;
+
+	System.out.println( "handlePrefix in: ."+retval+"." );
+
+	// Extract operator.
+	Pattern pattern = Pattern.compile("operator=\\(\\s*([^()]*?)\\s*\\)\\s*operand=\\(\\s*([^()]*?)\\s*\\)");
+	Matcher matcher = pattern.matcher(main);
+
+	if( matcher.find() )
+	{
+	    String op;
+	    Vector operands;
+	    operands = new Vector();
+
+	    op = matcher.group(1);
+
+	    System.out.println( "handlePrefix operator: ."+op+"." );
+
+	    // Extract operands.
+	    Pattern pattern2 = Pattern.compile("operand=\\(\\s*([^()]*?)\\s*\\)");
+	    Matcher matcher2 = pattern2.matcher(main);
+
+	    System.out.println( "handlePrefix operator2: ."+op+"." );
+	    while( matcher2.find() )
+	    {
+		System.out.println( "handlePrefix operator3: ."+op+"." );
+		operands.add( (String) matcher2.group(1) );
+		System.out.println( "handlePrefix operator4: ."+op+"." );
+
+		System.out.println( "handlePrefix operand: ."+matcher2.group(1)+"." );
+	    }
+
+	    System.out.println( "handlePrefix operator4: ."+op+"." );
+	    retval = handleOperator( op, operands, main );
+	    System.out.println( "handlePrefix retval: ."+retval+"." );
+	}
+
+	System.out.println( "handlePrefix out: ."+retval+"." );
+
+	return retval;
+    }
+
+    public static String handleInfix(
+	    String main, String direction
+	    )
+    {
+	Pattern pattern;
+	String retval;
+
+	// Extract three infix items.
+	if( direction == "right" )
+	{
+	    pattern = Pattern.compile("operand=\\(\\s*([^()]*?)\\s*\\)\\s*operator=\\(\\s*([^()]*?)\\s*\\)\\s*operand=\\(\\s*([^()]*?)\\s*\\)\\s*$");
+	} else if( direction == "left" ) {
+	    pattern = Pattern.compile("^\\s*operand=\\(\\s*([^()]*?)\\s*\\)\\s*operator=\\(\\s*([^()]*?)\\s*\\)\\s*operand=\\(\\s*([^()]*?)\\s*\\)");
+	} else {
+	    return "Bad direction in handleInfix";
+	}
+
+	Matcher matcher = pattern.matcher(main);
+
+	System.out.println( "handleInfix main: ."+main+". " + matcher.find( 0 ) );
+
+	if( matcher.find( 0 ) )
+	{
+	    System.out.println( "handleInfix main2: ."+main+". " + matcher.find( 0 ) );
+	    while( matcher.find( 0 ) )
+	    {
+		String op;
+		Vector operands;
+		operands = new Vector();
+
+		operands.add( (String) matcher.group(1) );
+		op = matcher.group(2);
+		operands.add( (String) matcher.group(3) );
+
+		/*
+		// Extract operands.
+		Pattern pattern2 = Pattern.compile("operand=\\(\\s*([^()]*?)\\s*\\)");
+		Matcher matcher2 = pattern2.matcher(main);
+
+		// MUST EXPLICITELY HANDLE ge'o SOMEHOW!
+		System.out.println( "handleInfix operator2: ."+op+"." );
+		while( matcher2.find() )
+		{
+		    operands.add( (String) matcher2.group(1) );
+
+		    System.out.println( "handleInfix operand: ."+matcher2.group(1)+"." );
+		}
+		*/
+
+		System.out.println( "handleInfix ops: ."+operands.get(0)+","+op+","+operands.get(1)+"." );
+
+		retval = handleOperator( op, operands, main );
+
+		System.out.println( "handleInfix retval: ."+retval+".");
+
+		main = matcher.replaceFirst( "####" );
+
+		System.out.println( "handleInfix main: ."+main+".");
+
+		if( main.matches( "\\s*####\\s*" ) )
+		{
+		    main = retval;
+		} else {
+		    main = main.split( "####" )[0] + retval + main.split( "####" )[1];
+		}
+
+		System.out.println( "handleInfix main2: ."+main+".");
+
+		matcher = pattern.matcher(main);
+
+		System.out.println( "handleInfix done with matcher: " + matcher.find( 0 ) + "." );
+	    }
+	}
+
+	retval = main;
+
+	return retval;
+    }
+
+    public static String latex(
+	    String pre, String main,
+	    boolean outermost
+	    )
+    {
+	String retval=main;
+
+	System.out.println( "mex type: ."+pre+","+main+"." );
+
+	if( mex_data.containsKey( pre ) )
+	{
+	    String op_type = ((String[]) mex_data.get( pre ))[0];
+	    String op_symbol = ((String[]) mex_data.get( pre ))[1];
+
+	    if( op_type.equals( "regex" ) )
+	    {
+		System.out.println( "Dollar-zero in: ."+retval+".");
+		System.out.println( "Dollar-zero symb: ."+op_symbol+".");
+
+		if( op_symbol != null )
+		{
+		    retval = " " + retval.replaceAll( ".+", op_symbol ) + " ";
+		} else {
+		    retval = "";
+		}
+
+		System.out.println( "Dollar-zero out: ."+retval+".");
+	    }
+	} else if( mex_data.containsKey( main ) ) {
+	    System.out.println( "main key found: " + main );
+	    String op_type = ((String[]) mex_data.get( main ))[0];
+	    String op_symbol = ((String[]) mex_data.get( main ))[1];
+	    System.out.println( "Contains symbol: ."+op_symbol+".");
+	    System.out.println( "Contains type: ."+op_type+".");
+
+	    if( op_type.equals( "show" ) )
+	    {
+		System.out.println( "show in: ."+retval+".");
+
+		retval = " " + op_symbol + " ";
+
+		System.out.println( "show out: ."+retval+".");
+	    }
+	} else if( pre == "operator" ) {
+	    System.out.println( "mexOperator in: ."+retval+"." );
+
+	    Pattern pattern = Pattern.compile("^\\s*operator=\\(\\s*na\\'u\\s*\\)");
+	    Matcher matcher = pattern.matcher( retval );
+
+	    if( matcher.find( 0 ) )
+	    {
+		System.out.println( "mexOperator group: ."+matcher.group( 0 )+"." );
+		retval = matcher.replaceFirst( "" );
+		System.out.println( "mexOperator out: ."+retval+"." );
+	    } else {
+		retval = retval;
+
+
+		System.out.println( "operator in: ."+retval+"." );
+		retval = handlePrefix( main );
+		System.out.println( "operator after: ."+retval+"." );
+
+		pattern = Pattern.compile("^\\s*operator=\\(\\s*([^()]*?)\\s*\\)");
+		matcher = pattern.matcher( retval );
+
+		if( matcher.find( 0 ) )
+		{
+		    retval = retval;
+		} else {
+		    retval = " operator=( " + retval + " ) ";
+		}
+	    }
+
+	    System.out.println( "operator out: ."+retval+"." );
+	} else if( pre == "operand" ) {
+	    System.out.println( "operand in: ."+main+"." );
+	    Pattern pattern = Pattern.compile("^\\s*operand=\\(\\s*([^()]*?)\\s*\\)");
+	    Matcher matcher = pattern.matcher(main);
+
+	    if( matcher.find() )
+	    {
+		retval = main;
+	    } else {
+		retval = " " + pre + "=( " + main + " ) ";
+	    }
+	} else if( pre == "quantifier" ) {
+	    Pattern pattern = Pattern.compile("^\\s*(.*?)\\s*operator=");
+	    Matcher matcher = pattern.matcher(main);
+	    retval = matcher.replaceFirst( "operand=( $1 ) operator=" );
+	} else if( pre == "free" ) {
+	    System.out.println( "free in: ."+main+"." );
+	    main = main.replaceFirst( "xiClause=\\( ", "" );
+	    Pattern pattern = Pattern.compile("(operator=\\(\\s*[^()]*?\\s*\\)\\s*)([0-9]*?)\\s*\\)?\\s*$");
+	    Matcher matcher = pattern.matcher(main);
+	    retval = matcher.replaceFirst( "$1 operand=( $2 )" );
+	} else if( main.matches(".*operator=\\(\\s*([^()]*?)\\s*\\).*") && ! pre.matches( ".*PARSERparen.*" ) ) {
+	    retval = main.trim();
+
+	    System.out.println( "OPERATION in: ."+retval+"." );
+
+	    retval = handleInfix( main, "left" );
+	    retval = handlePrefix( retval );
+
+	    System.out.println( "OPERATION out: ."+retval+"." );
+	} else {
+	    retval = main;
+	}
+
+	return retval;
+    }
+
+    public static String makeStringByType(
+	    String pre, String main,
+	    String type,
+	    boolean outermost
+	    )
+    {
+	if( terml )
+	{
+	    // System.out.println( "main1: ."+main+"." );
+	    /* Wrap literals in ". */
+	    //Pattern pattern = Pattern.compile("^[^()\"]+$");
+	    Pattern pattern = Pattern.compile("( [A-Z]+)=?(\\(  *[a-zA-Z]+)=(\\(  *)([^)]*?)(  *\\)  *\\)? *)");
+	    Matcher matcher = pattern.matcher(main);
+	    if( matcher.matches() )
+	    {
+		main = matcher.replaceFirst( "$1$2$3\"$4\"$5" );
+	    } else {
+		pattern = Pattern.compile("(  *[a-zA-Z]+)=(\\(  *)([a-zA-Z0-9']*)(  *\\)  *)");
+		matcher = pattern.matcher(main);
+		if( matcher.matches() )
+		{
+		    main = matcher.replaceFirst( "$1$2\"$3\"$4" );
+		} else {
+		    /* System.out.println( "main1: ."+main+"." ); */
+
+		    /* put commas between successive elements. */
+		    Pattern pattern2 = Pattern.compile("[)]\\s+(?=[\"a-zA-Z])");
+		    Matcher matcher2 = pattern2.matcher(main);
+		    main = matcher2.replaceAll( "), " );
+
+		    Pattern pattern5 = Pattern.compile("[\"]\\s+(?=[\"a-zA-Z])");
+		    Matcher matcher5 = pattern5.matcher(main);
+		    main = matcher5.replaceAll( "\", " );
+
+		    /* System.out.println( "main2: ."+main+"." ); */
+		}
+	    }
+	    // System.out.println( "main2: ."+main+"." );
+
+	    // Really get rid of =
+	    main = main.replaceAll( "=", "" );
+	}
+
+	String retval=main;
+
+	// Replace special whitespace chars with space to stop them
+	// from screwing up visual output.
+	//retval = main.replace( '\n', '.' );
+	//retval = retval.replace( '\r', '.' );
+
+	if( type.equals( "normal" ) || type.equals( "public" ) )
+	{
+	    if( terml )
+	    {
+		retval = " " + pre + "( " + retval + " ) ";
+	    } else if ( ! verbose ) {
+		retval = nonVerbose( pre, retval, outermost );
+	    } else {
+		retval = " " + pre + "=( " + retval + " ) ";
+	    }
+	} else if( type.equals( "parserParen" ) ) {
+	    if( parserParens )
+	    {
+		if( terml )
+		{
+		    retval = " " + pre + "( " + retval + " ) ";
+		} else if ( ! verbose ) {
+		    retval = nonVerbose( pre, retval, outermost );
+		} else {
+		    retval = " " + pre + "=( " + retval + " ) ";
+		}
+	    }
+	} else if( type.equals( "morphology" ) ) {
+	    if( morphology )
+	    {
+		if( terml )
+		{
+		    retval = " " + pre + "( " + retval + " ) ";
+		} else if ( ! verbose ) {
+		    retval = nonVerbose( pre, retval, outermost );
+		} else {
+		    retval = " " + pre + "=( " + retval + " ) ";
+		}
+	    }
+	} else if( type.equals( "whitespace" ) ) {
+	    if( whitespace )
+	    {
+		if( terml )
+		{
+		    retval = " " + pre + "( " + retval + " ) ";
+		} else if ( ! verbose ) {
+		    retval = nonVerbose( pre, retval, outermost );
+		} else {
+		    retval = " " + pre + "=( " + retval + " ) ";
+		}
+	    } else {
+		retval = "";
+	    }
+	}
+
+	if ( latex ) {
+	    retval = latex( pre, retval, outermost );
+	}
+
+	// Handle blank entries.
+	if( main.equals( "" ) )
+	{
+	    if( ! blanks )
+	    {
+		retval = "";
+	    }
+	}
+
+	return retval;
+    }
+
+    // This version of makeString handles the single character case.
+    public static String makeString(
+	    String pre, char value,
+	    String type, boolean outermost
+	    )
+    {
+	return makeString( pre, String.valueOf( value ), type, outermost );
+    }
+
+    // Turns a node into a string, with handling of command line options.
+    public static String makeString(
+	    String pre, Object value,
+	    String type, boolean outermost
+	    )
+    {
+	String retVal="";
+	if( value != null )
+	{
+	    if( value instanceof Pair )
+	    {
+		for(int i = 0; i<((Pair)value).size(); i++) 
+		{
+		    Object pairElement;
+
+		    pairElement = ((Pair)value).list().get(i);
+		    retVal = retVal + makeString( pre, pairElement, type, outermost );
+		}
+	    } else {
+		retVal = makeStringByType( pre, value.toString(), type, outermost );
+	    }
+	} else {
+	    retVal = ""; 
+	}
+
+	// Returns a version of the input where all contiguous
+	// whitespace characters are replaced with a single
+	// space. Line terminators are treated like whitespace.
+	/*
+	String patternStr = "\\(\\s+\\)";
+	String replaceStr = "(.)";
+	Pattern pattern = Pattern.compile(patternStr);
+	Matcher matcher = pattern.matcher(retVal);
+	return matcher.replaceAll(replaceStr);
+	*/
+	return retVal;
+    }
+
+    public static String finalMakeString(
+	    Object value
+	    )
+    {
+	String total = makeString( "text", value, "normal", true );
+
+	if( terml )
+	{
+	    /* Clear out extra quotes. */
+	    Pattern pattern4 = Pattern.compile("[\"][\"]+");
+	    Matcher matcher4 = pattern4.matcher(total);
+	    total = matcher4.replaceAll( "" );
+	}
+
+	// Fix parens and such.
+	if( latex )
+	{
+	    System.out.println( "total: " + total );
+
+	    total = total.replaceAll( "operand=\\(\\s*\\{?", "" );
+	    total = total.replaceAll( "\\}?\\s*\\)", "" );
+
+	    if( total.matches( "^\\s*\\{.*" ) && total.matches( ".*\\}\\s*$" ) )
+	    {
+		total = total.replaceAll( "^\\s*\\{", "" );
+		total = total.replaceAll( "\\}\\s*$", "" );
+	    }
+
+	    total = total.replace( '{', '(' );
+	    total = total.replace( '}', ')' );
+
+	    total = total.replaceAll( "\\!\\(", " \\{" );
+	    total = total.replaceAll( "\\)\\!", "\\}" );
+
+	    total = handleShifts( total );
+	}
+
+	// Remove non-textual stuff.
+	if( text )
+	{
+	    total = total.replaceAll( " [^= ]+=\\( ", "" );
+	    total = total.replaceAll( " \\) ", "" );
+	    total = total.replaceAll( " \\) ", "" );
+	}
+
+	return total;
+    }
+
+    public static void main(String[] args)
+    {
+	//System.out.print("Doing getopt..\n");
+	Getopt g = new Getopt("testprog", args, "-mMpsbvtehfnl?");
+	int c;
+	String arg;
+	String usage="Usage: -[bpmMstvhPl] <file-name>+\n" +
+	    "\n" +
+	    "Use /dev/stdin for standard input instead of a file, at least on unix.\n" +
+	    "\n" +
+	    "-v: Verbose output.\n" +
+	    "\n" +
+	    "-f: Flat visual output.\n" +
+	    "\n" +
+	    "-n: Numerical calculation mode.\n" +
+	    "\n" +
+	    "-n: LaTeX mekso mode.\n" +
+	    "\n" +
+	    "-m: Produce a simple morphological breakdown.\n" +
+	    "\n" +
+	    "-M: Produce a verbose morphological breakdown.\n" +
+	    "\n" +
+	    "-p: Show parser paren data (basically just for debugging).\n" +
+	    "\n" +
+	    "-s: Show things normally considered spaces (actual space characters as well as\n" +
+	    "SI/SA/SU clauses).\n" +
+	    "\n" +
+	    "-b: Show blank productions.\n" +
+	    "\n" +
+	    "-t: Text mode: show only the parsed text, with no markup (except morphology, if -m is used).\n" +
+	    "\n" +
+	    "-e: TermL mode: changes to the markup designed for use with E programs.\n" +
+	    "\n" +
+	    "-h: This help.\n" +
+	    "";
+
+	//if ((null == args) || (0 == args.length))
+	//{
+	    //System.out.println( usage );
+	//} else {
+	    pretty = true;
+	    verbose = false;
+	    text = false;
+
+	    while ((c = g.getopt()) != -1)
+	    {
+		switch(c)
+		{
+		    case 'm':
+			System.out.print("Simple morphological breakdown requested.\n");
+			morphprint = true;
+			break;
+		    case 'M':
+			System.out.print("Verbose morphological breakdown requested.\n");
+			morphology = true;
+			break;
+		    case 'p':
+			System.out.print("PARSERparen data requested.\n");
+			parserParens = true;
+			break;
+		    case 'b':
+			System.out.print("Blank data requested.\n");
+			blanks = true;
+			break;
+		    case 'e':
+			System.out.print("TermL data requested.\n");
+			terml = true;
+			pretty = false;
+			break;
+		    case 's':
+			System.out.print("Whitespace data requested.\n");
+			whitespace = true;
+			break;
+		    case 'v':
+			System.out.print("Verbose data requested.\n");
+			verbose = true;
+			text = false;
+			break;
+		    case 'f':
+			System.out.print("Flat layout requested.\n");
+			pretty = false;
+			break;
+		    case 'l':
+			System.out.print("LaTeX mekso requested.\n");
+			latex = true;
+			text = true;
+			pretty = false;
+			break;
+		    case 't':
+			System.out.print("Text-only mode requested.\n");
+			pretty = false;
+			text = true;
+			blanks = true;
+			whitespace = true;
+			break;
+		    case 'h':
+		    case '?':
+			System.out.println( usage );
+			return;
+		    default:
+			return;
+		}
+	    }
+
+	    //System.out.print("getopt() returned " + c + "; " + g.getOptarg() + "\n");
+	    //System.out.println("Processing " + g.getOptarg() + " ...");
+	    //System.out.println("Processing standard input.\n");
+
+	    if( latex )
+	    {
+		loadMexData();
+	    }
+
+	    BufferedReader    in = null;
+	    Reader    in2 = null;
+	    Reader    input_reader = null;
+	    try {
+		// Snarf all the input so we can find
+		// out how long it is.
+		//StringBuffer input_buffer;
+		String input_string;
+		//input_buffer = new StringBuffer( "" );
+		//in         = new BufferedReader(new FileReader( g.getOptarg() ));
+		in         = new BufferedReader(new InputStreamReader(System.in, "US-ASCII" ) );
+
+		input_string = in.readLine();
+		while( input_string != null )
+		{
+		    boolean orig_parserParens;
+		    boolean orig_whitespace;
+		    boolean orig_blanks;
+		    boolean orig_text;
+		    boolean orig_terml;
+		    boolean orig_verbose;
+		    boolean orig_latex;
+
+		    orig_parserParens = parserParens;
+		    orig_blanks = blanks;
+		    orig_text = text;
+		    orig_terml = terml;
+		    orig_verbose = verbose;
+		    orig_latex = latex;
+
+		    parserParens = false;
+		    blanks = false;
+		    text = false;
+		    terml = false;
+		    verbose = true;
+		    latex = false;
+
+		    //input_buffer.append( input_string );
+		    //input_string = input_buffer.toString();
+		    //input_string = input_string.replace( '\n', ' ' );
+
+		    input_reader         = new BufferedReader(new StringReader( input_string ));
+		    lojban p  = new lojban(input_reader, "Morphology Pass" );
+		    Result  r  = p.pmorphology( 0 ); // BUG
+		    String total1 = null, total2;
+
+		    if (r.hasValue()) {
+			SemanticValue v   = (SemanticValue)r;
+
+			if (v.value instanceof GNode) {
+			    new Printer(System.out).incr().p((GNode)v.value).flush();
+			    //new Printer((PrintWriter)dp).incr().p((GNode)v.value).flush();
+			} else {
+			    total1 = finalMakeString( v.value );
+			    // Fix Morph stuff.
+			    total1 = total1.replaceAll( "Morph=\\(", "=(" );
+
+			    if( pretty )
+			    {
+				if( blanks )
+				{
+				    if( morphology || morphprint )
+				    {
+					System.out.println( "Morphology pass: \n" + dispVert( total1, false ) );
+				    }
+				} else {
+				    if( morphology || morphprint )
+				    {
+					System.out.println( "Morphology pass: \n" + dispVert( total1, true ) );
+				    }
+				}
+			    } else {
+				if( morphology || morphprint )
+				{
+				    System.out.println( "Morphology pass: " + total1 );
+				}
+			    }
+			}
+
+		    } else {
+			System.out.println( "Error in morphology phase.\n" );
+			/*
+			   ParseError    err = (ParseError)r;
+			   System.out.println("  " + p.location( err.index ) + ": " + err.msg);
+			   */
+		    }
+
+		    parserParens = orig_parserParens;
+		    blanks = orig_blanks;
+		    text = orig_text;
+		    terml = orig_terml;
+		    verbose = orig_verbose;
+		    latex = orig_latex;
+
+		    total1 = total1.replaceFirst( "^ text=\\( ", "" );
+		    total1 = total1.replaceFirst( " \\) $", "" );
+		    in2         = new BufferedReader(new StringReader( total1 ));
+		    lojban p2  = new lojban( in2, "Main Pass" );
+		    Result  r2  = p2.ptext( 0 );
+
+		    if (r2.hasValue()) {
+			SemanticValue v = (SemanticValue)r2;
+
+			if (v.value instanceof GNode) {
+			    new Printer(System.out).incr().p((GNode)v.value).flush();
+			    //new Printer((PrintWriter)dp).incr().p((GNode)v.value).flush();
+			} else {
+			    total2 = finalMakeString( v.value );
+
+			    if( pretty )
+			    {
+				if( blanks )
+				{
+				    System.out.println( dispVert( total2, false ) );
+				} else {
+				    System.out.println( dispVert( total2, true ) );
+				}
+			    } else {
+				System.out.println( total2 );
+			    }
+			}
+
+		    } else {
+			System.out.println( "Error in main phase.\n" );
+			/*
+			   ParseError    err = (ParseError)r2;
+			   System.out.println("  " + p2.location( err.index ) + ": " + err.msg);
+			   */
+		    }
+
+		    input_string = in.readLine();
+		}
+
+	    } catch (Throwable x) {
+		x.printStackTrace();
+
+		while (null != x.getCause()) {
+		    x = x.getCause();
+		}
+		System.out.println("  " + x.toString());
+	    } finally {
+		try {
+		    in.close();
+		    in2.close();
+		    input_reader.close();
+		} catch (Throwable x) {
+		}
+	    }
+
+	    //System.out.print("Done getopt..\n");
+
+	    //}
+    }
+    /*
+    // Strip spaces front and back, test for equality.
+    public static boolean myStringCompare (String str1, String str2) {
+    str1 = str1.replace( '?', ' ' );
+    str1 = str1.replace( '!', ' ' );
+    str1 = str1.replace( '.', ' ' );
+
+    str2 = str2.replace( '?', ' ' );
+    str2 = str2.replace( '!', ' ' );
+    str2 = str2.replace( '.', ' ' );
+
+    str1 = str1.trim();
+    str2 = str2.trim();
+
+    System.out.println("str1: ;" + str1 + ";");
+    System.out.println("str2: ;" + str2 + ";");
+
+    return str1.equals( str2 );
+    }
+    */
+
+    // VFormat.java
+    // tests the dispVert() function, which reformats output vertically
+    // the output comes from Robin Lee Powell's Rats parser for Lojban
+    // Bruce Webber 05/27/04
+
+
+    private static String dispVert(String aS_input, boolean ab_collapse) {
+	String lS_input = aS_input.trim();
+	StringBuffer lSb_output = new StringBuffer();
+
+	if (lS_input.length() > 0) {
+	    // recursively create the parse tree
+	    ParseNode l_ParseNode = new ParseNode(lS_input);
+
+	    // create the viewable representation of the parse tree
+	    lSb_output = displayNode(l_ParseNode, ab_collapse, "", "", "", false);
+	}
+
+	return lSb_output.toString();
+    }
+
+    private static StringBuffer displayNode(
+	    ParseNode a_ParseNode,
+	    boolean ab_collapse,
+	    String aS_indentBase,
+	    String aS_indentFirst,
+	    String aS_indentRest,
+	    boolean ab_collapsing) {
+
+	// these are the indent strings
+	final String INDENT = "   ";
+	final String INDENT_V = "|  ";
+	final String INDENT_V_DASH = "|- ";
+
+	if (a_ParseNode.getNumChild() == 0) {
+	    // if the node has no children, display it
+	    return new StringBuffer(aS_indentBase + aS_indentFirst + a_ParseNode.getValue() + "\n");
+	}
+	else if (ab_collapse && !ab_collapsing &&
+		a_ParseNode.getNumChild() == 1 &&
+		ParseUtil.removeNumerals(a_ParseNode.getValue()).equals(ParseUtil.removeNumerals(a_ParseNode.getChild(0).getValue()))) {
+	    // the node has only one child, and the value of the node is the same as the child (without numerals)
+	    //		and this is the top level of this structure
+	    StringBuffer lSb_display;
+	    if (a_ParseNode.getChild(0).getNumChild() == 1 &&
+		    ParseUtil.removeNumerals(a_ParseNode.getChild(0).getValue()).equals(ParseUtil.removeNumerals(a_ParseNode.getChild(0).getChild(0).getValue()))) {
+		// if the same applies to the child include ellipses
+		lSb_display = new StringBuffer(aS_indentBase + aS_indentFirst + a_ParseNode.getValue() + " ...\n");
+	    }
+	    else {
+		lSb_display = new StringBuffer(aS_indentBase + aS_indentFirst + a_ParseNode.getValue() + "\n");
+	    }
+	    lSb_display.append(displayNode(a_ParseNode.getChild(0), ab_collapse,
+			aS_indentBase + aS_indentRest, INDENT, INDENT, true));
+	    return lSb_display;
+	}
+	else if (ab_collapse && ab_collapsing && a_ParseNode.getNumChild() == 1 &&
+		ParseUtil.removeNumerals(a_ParseNode.getValue()).equals(ParseUtil.removeNumerals(a_ParseNode.getChild(0).getValue()))) {
+	    // if the node has only one child, and the value of the node is the same as the child, display only the child
+	    return displayNode(a_ParseNode.getChild(0), ab_collapse, aS_indentBase, aS_indentFirst, aS_indentRest, true);
+	}
+	else if (a_ParseNode.getNumChild() == 1 && a_ParseNode.getChild(0).isTerminal()) {
+	    // if the node has only one child, and the child is a terminal, display both on the same line
+	    return new StringBuffer(aS_indentBase + aS_indentFirst + a_ParseNode.getValue() + ": " +
+		    a_ParseNode.getChild(0).getValue() + "\n");
+	}
+	else {
+	    // otherwise display each of the children on a separate line
+	    StringBuffer lSb_display = new StringBuffer(aS_indentBase + aS_indentFirst + a_ParseNode.getValue() + "\n");
+	    if (a_ParseNode.getNumChild() == 1) {
+		// only one child
+		lSb_display.append(displayNode(a_ParseNode.getChild(0), ab_collapse,
+			    aS_indentBase + aS_indentRest, INDENT, INDENT, false));
+	    }
+	    else {
+		for (int i = 0; i < a_ParseNode.getNumChild(); i++) {
+		    if (i == 0) {
+			// first child
+			lSb_display.append(displayNode(a_ParseNode.getChild(i), ab_collapse,
+				    aS_indentBase + aS_indentRest, INDENT_V_DASH, INDENT_V, false));
+		    }
+		    else if (i == a_ParseNode.getNumChild() - 1) {
+			// last child
+			lSb_display.append(displayNode(a_ParseNode.getChild(i), ab_collapse,
+				    aS_indentBase + aS_indentRest, INDENT_V_DASH, INDENT, false));
+		    }
+		    else {
+			lSb_display.append(displayNode(a_ParseNode.getChild(i), ab_collapse,
+				    aS_indentBase + aS_indentRest, INDENT_V_DASH, INDENT_V, false));
+		    }
+		}
+	    }
+	    return lSb_display;
+	}
+    }
+
+
+    static class ParseNode {
+	String iS_value;
+	boolean ib_terminal;
+	int ii_numChild;
+	ArrayList iLi_child;
+
+	// constructor
+	public ParseNode() {
+	    iS_value = "";
+	    ib_terminal = true;
+	    ii_numChild = 0;
+	    iLi_child = new ArrayList();
+	}
+
+	// constructor
+	public ParseNode(String aS_text) {
+	    ii_numChild = 0;
+	    iLi_child = new ArrayList();
+
+	    // find the end of the node
+	    String lS_text = aS_text.substring(0, ParseUtil.endOfNode(aS_text) + 1);
+
+	    if (ParseUtil.isTerminal(lS_text)) {
+		// this is a terminal node
+		iS_value = lS_text;
+		ib_terminal = true;
+	    }
+	    else {
+		// this node has sub-nodes
+		iS_value = ParseUtil.getToken(ParseUtil.getWord(lS_text));
+		ib_terminal = false;
+
+		// add the sub-nodes
+		lS_text = ParseUtil.getTail(lS_text);
+		while (!lS_text.equals(")")) {
+		    addChild(lS_text.substring(0, ParseUtil.endOfNode(lS_text) + 1));
+		    lS_text = lS_text.substring(ParseUtil.endOfNode(lS_text) + 1).trim();
+		}
+	    }
+	}
+
+	// access methods
+
+	public String getValue() {
+	    return iS_value;
+	}
+
+	public boolean isTerminal() {
+	    return ib_terminal;
+	}
+
+	public int getNumChild() {
+	    return ii_numChild;
+	}
+
+	public ParseNode addChild(String aS_value) {
+	    iLi_child.add(ii_numChild, new ParseNode(aS_value));
+	    return (ParseNode) iLi_child.get(ii_numChild++);
+	}
+
+	public ParseNode getChild(int ai_index) {
+	    return (ParseNode) iLi_child.get(ai_index);
+	}
+
+    } // end of class ParseNode
+
+
+    static class ParseUtil {
+	// return the first word of a string
+	public static String getWord(String aS_text) {
+	    String lS_text = aS_text.trim();
+	    int li_spaceLoc = lS_text.indexOf(" ");
+	    if (li_spaceLoc == -1) {
+		return lS_text;
+	    }
+	    else {
+		return lS_text.substring(0, lS_text.indexOf(" "));
+	    }
+	}
+
+	// return the string, excluding the first word
+	public static String getTail(String aS_text) {
+	    String lS_text = aS_text.trim();
+	    int li_spaceLoc = lS_text.indexOf(" ");
+	    if (li_spaceLoc == -1) {
+		return "";
+	    }
+	    else {
+		return lS_text.substring(li_spaceLoc + 1);
+	    }
+	}
+
+	// return true if the node is a terminal node
+	public static boolean isTerminal(String aS_text) {
+	    if (getWord(aS_text).endsWith("=(")) {
+		return false;
+	    }
+	    else {
+		return true;
+	    }
+	}
+
+	// return the string, excluding the trailing "=("
+	public static String getToken(String aS_text) {
+	    Pattern l_Pattern = Pattern.compile(" *([a-zA-Z]*[0-9]*)(\\=\\()? *");
+	    Matcher l_Matcher = l_Pattern.matcher(aS_text);
+	    if (l_Matcher.matches()) {
+		return l_Matcher.group(1);
+	    }
+	    else {
+		return "";
+	    }
+	}
+
+	// return the string, excluding the trailing numerals if present
+	public static String removeNumerals(String aS_text) {
+	    Pattern l_Pattern = Pattern.compile(" *([a-zA-Z]*)([0-9]*) *");
+	    Matcher l_Matcher = l_Pattern.matcher(aS_text);
+	    if (l_Matcher.matches()) {
+		return l_Matcher.group(1);
+	    }
+	    else {
+		return "";
+	    }
+	}
+
+	// find the index of the end of the node (the closing right paren)
+	public static int endOfNode(String aS_text) {
+	    int li_endIndex = -1;
+
+	    if (isTerminal(aS_text)) {
+		// this is a terminal node
+		int li_spaceLoc = aS_text.indexOf(" ");
+		if (li_spaceLoc == -1) {
+		    li_endIndex = aS_text.length() - 1;
+		}
+		else {
+		    li_endIndex = aS_text.indexOf(" ") - 1;
+		}
+	    }
+	    else {
+		int li_parenCount = 0;
+		boolean lb_seenParen = false;
+		for (int i = 0; i < aS_text.length(); i++) {
+		    if (aS_text.charAt(i) == '(') {
+			li_parenCount++;
+			lb_seenParen = true;
+		    }
+
+		    if (aS_text.charAt(i) == ')') {
+			li_parenCount--;
+		    }
+
+		    if (lb_seenParen && li_parenCount == 0) {
+			li_endIndex = i;
+			break;
+		    }
+		}
+
+		if (li_endIndex == -1) {
+		    throw new IndexOutOfBoundsException();
+		}
+
+	    }
+
+	    return li_endIndex;
+	}
+
+    } // end of class ParseUtil
+
+}
+
+//option withLocation, constant, parser(xtc.lang.JavaPackratParser);
+
+//option location,debug;
+
+//top text, morphology;

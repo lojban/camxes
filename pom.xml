@@ -1,0 +1,151 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>org.lojban</groupId>
+  <artifactId>camxes</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>camxes</name>
+  <url>http://maven.apache.org</url>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <org.lojban.camxes.mainClass>xtc.lang.lojban</org.lojban.camxes.mainClass>
+    <org.lojban.camxes.ratsFile>generated-sources/peg/lojban.rats</org.lojban.camxes.ratsFile>
+    <org.perl.path>/usr/bin/perl</org.perl.path>
+    <xtc.version>1.15.0</xtc.version>
+  </properties>
+
+  <dependencies>
+
+    <dependency>
+      <groupId>xtc</groupId>
+      <artifactId>rats</artifactId>
+      <version>${xtc.version}</version>
+      <scope>compile</scope>
+    </dependency>
+
+    <!--
+    <dependency>
+      <groupId>xtc</groupId>
+      <artifactId>rats-runtime</artifactId>
+      <version>${xtc.version}</version>
+      <scope>runtime</scope>
+    </dependency>
+    -->
+
+    <dependency>
+      <groupId>gnu.getopt</groupId>
+      <artifactId>java-getopt</artifactId>
+      <version>1.0.13</version>
+      <scope>compile</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+
+    <defaultGoal>package</defaultGoal>
+
+    <plugins>
+
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>1.2.1</version>
+        <executions>
+          <execution>
+            <id>peg2rats-generate</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <executable>${org.perl.path}</executable>
+          <arguments>
+            <argument>bin/peg2rats.pl</argument>
+            <argument>${project.build.directory}/${org.lojban.camxes.ratsFile}</argument><!-- output -->
+            <argument>src/main/resources/header.rats</argument>
+            <argument>src/main/resources/lojban.peg</argument>
+            <argument>src/main/resources/morph_header.peg</argument>
+            <argument>src/main/resources/lojban_morphology.peg</argument>
+          </arguments>
+          <!-- outputFile not working, so hacked peg2rats.pl -->
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>de.fau.cs.osr.maven.plugins</groupId>
+        <artifactId>maven-rats-plugin</artifactId>
+        <version>1.3.2</version>
+        <executions>
+          <execution>
+            <id>rats-generate</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <ratsInputFiles>
+            <ratsInputFile>${project.build.directory}/${org.lojban.camxes.ratsFile}</ratsInputFile>
+          </ratsInputFiles>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>2.4</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>${org.lojban.camxes.mainClass}</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>2.4</version>
+        <executions>
+          <execution>
+            <id>create-my-bundle</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+            <configuration>
+              <descriptorRefs>
+                <descriptorRef>jar-with-dependencies</descriptorRef>
+              </descriptorRefs>
+              <!--
+              <descriptors>
+                <descriptor>src/assemble/distribution.xml</descriptor>
+              </descriptors>
+              -->
+            </configuration>
+          </execution>
+        </executions>
+
+        <configuration>
+          <archive>
+            <manifest>
+              <mainClass>${org.lojban.camxes.mainClass}</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+
+      </plugin>
+
+    </plugins>
+  </build>
+
+</project>

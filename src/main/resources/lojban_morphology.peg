@@ -1,0 +1,525 @@
+; This is a Parsing Expression Grammar for the morphology of Lojban.%%%
+; See [http://www.pdos.lcs.mit.edu/~baford/packrat/] %%%
+; %%%
+; All rules have the form %%%
+; %%%
+; 	name <- peg-expression%%%
+; %%%
+; which means that the grammatical construct "name" is parsed using%%%
+; "peg-expression".  %%%
+; %%%
+; 1)  Concatenation is expressed by juxtaposition with no operator symbol.%%%
+; 2)  / represents *ORDERED* alternation (choice).  If the first%%%
+;     option succeeds, the others will never be checked.%%%
+; 3)  ? indicates that the element to the left is optional.%%%
+; 4)  * represents optional repetition of the construct to the left.%%%
+; 5)  + represents one-or-more repetition of the construct to the left.%%%
+; 6)  () serves to indicate the grouping of the other operators.%%%
+; 7)  & indicates that the element to the right must follow (but the%%%
+;     marked element itself does not absorb anything).%%%
+; 8)  ! indicates that the element to the right must not follow (the%%%
+;     marked element itself does not absorb anything).%%%
+; 9)  . represents any character.%%%
+; 10) ' ' or " " represents a literal string.%%%
+; 11) [] represents a character class.   %%% 
+;%%%
+; Repetitions grab as much as they can.%%%
+;%%%
+;%%%
+; --- GRAMMAR ---%%%
+; This grammar classifies words by their morphological class (cmene,%%%
+; gismu, lujvo, fuhivla, cmavo, and non-lojban-word). %%%
+; %%%
+;The final section sorts cmavo into grammatical classes (A, BAI, BAhE, ..., ZOhU).%%%
+;%%%
+; mi'e ((xorxes))%%%
+
+;-------------------------------------------------------------------%%%
+
+words <- pause? (word pause?)*
+
+word <- lojban-word / non-lojban-word
+
+lojban-word <- cmene / cmavo / brivla
+
+brivla <- gismu / fuhivla / lujvo
+
+;-------------------------------------------------------------------
+
+cmene <- jbocme / zifcme
+
+zifcme <- !h (nucleus / glide / h / consonant !pause / digit)* consonant &pause
+
+jbocme <- &zifcme (any-syllable / digit)* &pause 
+
+;cmene <- !h &consonant-final coda? (any-syllable / digit)* &pause
+
+;consonant-final <- (non-space &non-space)* consonant &pause
+
+;cmene <- !h cmene-syllable* &consonant coda? consonantal-syllable* onset &pause
+
+;cmene-syllable <- !doi-la-lai-lahi coda? consonantal-syllable* onset nucleus / digit
+
+;doi-la-lai-lahi <- (d o i / l a (h? i)?) !h !nucleus
+
+;-------------------------------------------------------------------
+
+cmavo <- !cmene !CVCy-lujvo cmavo-form &post-word 
+
+CVCy-lujvo <- CVC-rafsi y h? initial-rafsi* brivla-core / stressed-CVC-rafsi y short-final-rafsi
+
+cmavo-form <- !h !cluster onset (nucleus h)* (!stressed nucleus / nucleus !cluster) / y+ / digit
+
+;-------------------------------------------------------------------
+
+lujvo <- !gismu !fuhivla !cmavo initial-rafsi* brivla-core
+
+brivla-core <- fuhivla / gismu / CVV-final-rafsi / stressed-initial-rafsi short-final-rafsi 
+
+stressed-initial-rafsi <- stressed-extended-rafsi / stressed-y-rafsi / stressed-y-less-rafsi
+
+initial-rafsi <- extended-rafsi / y-rafsi / !any-extended-rafsi y-less-rafsi
+
+any-extended-rafsi <- fuhivla / extended-rafsi / stressed-extended-rafsi
+
+;-------------------------------------------------------------------
+
+fuhivla <- fuhivla-head stressed-syllable consonantal-syllable* final-syllable
+
+stressed-extended-rafsi <- stressed-brivla-rafsi / stressed-fuhivla-rafsi 
+
+extended-rafsi <- brivla-rafsi / fuhivla-rafsi
+
+stressed-brivla-rafsi <- &unstressed-syllable brivla-head stressed-syllable h y
+
+brivla-rafsi <- &(syllable consonantal-syllable* syllable) brivla-head h y h?
+
+stressed-fuhivla-rafsi <- fuhivla-head stressed-syllable &consonant onset y 
+
+fuhivla-rafsi <- &unstressed-syllable fuhivla-head &consonant onset y h?
+
+fuhivla-head <- !rafsi-string brivla-head
+
+brivla-head <- !cmavo !slinkuhi !h &onset unstressed-syllable*
+
+slinkuhi <- consonant rafsi-string
+
+rafsi-string <- y-less-rafsi* (gismu / CVV-final-rafsi / stressed-y-less-rafsi short-final-rafsi / y-rafsi / stressed-y-rafsi / stressed-y-less-rafsi? initial-pair y)
+
+;-------------------------------------------------------------------
+
+gismu <- (initial-pair stressed-vowel / consonant stressed-vowel consonant) &final-syllable consonant vowel &post-word
+
+CVV-final-rafsi <- consonant stressed-vowel h &final-syllable vowel &post-word
+
+short-final-rafsi <- &final-syllable (consonant diphthong / initial-pair vowel) &post-word
+
+stressed-y-rafsi <- (stressed-long-rafsi / stressed-CVC-rafsi) y
+
+stressed-y-less-rafsi <- stressed-CVC-rafsi !y / stressed-CCV-rafsi / stressed-CVV-rafsi
+
+stressed-long-rafsi <- initial-pair stressed-vowel consonant / consonant stressed-vowel consonant consonant
+
+stressed-CVC-rafsi <- consonant stressed-vowel consonant 
+
+stressed-CCV-rafsi <- initial-pair stressed-vowel 
+
+stressed-CVV-rafsi <- consonant (unstressed-vowel h stressed-vowel / stressed-diphthong) r-hyphen? 
+
+y-rafsi <- (long-rafsi / CVC-rafsi) y h?
+
+y-less-rafsi <- !y-rafsi (CVC-rafsi !y / CCV-rafsi / CVV-rafsi) !any-extended-rafsi
+
+long-rafsi <- initial-pair unstressed-vowel consonant / consonant unstressed-vowel consonant consonant 
+
+CVC-rafsi <- consonant unstressed-vowel consonant
+
+CCV-rafsi <- initial-pair unstressed-vowel
+
+CVV-rafsi <- consonant (unstressed-vowel h unstressed-vowel / unstressed-diphthong) r-hyphen?
+
+r-hyphen <- r &consonant / n &r
+
+;-------------------------------------------------------------------
+
+final-syllable <-  onset !y !stressed nucleus !cmene &post-word
+
+stressed-syllable <- &stressed syllable / syllable &stress
+
+stressed-diphthong <- &stressed diphthong / diphthong &stress
+
+stressed-vowel <- &stressed vowel / vowel &stress
+
+unstressed-syllable <- !stressed syllable !stress / consonantal-syllable
+
+unstressed-diphthong <- !stressed diphthong !stress
+
+unstressed-vowel <- !stressed vowel !stress
+
+stress <- consonant* y? syllable pause
+
+stressed <- onset comma* [AEIOU]
+
+any-syllable <- onset nucleus coda? / consonantal-syllable 
+
+syllable <- onset !y nucleus coda?
+
+consonantal-syllable <- consonant syllabic &(consonantal-syllable / onset) (consonant &spaces)?
+
+coda <- !any-syllable consonant &any-syllable / syllabic? consonant? &pause 
+
+onset <-  h / consonant? glide / initial
+
+nucleus <- vowel / diphthong / y !nucleus
+
+;-----------------------------------------------------------------
+
+glide <- (i / u) &nucleus !glide
+
+diphthong <- (a i / a u / e i / o i) !nucleus !glide
+
+vowel <- (a / e / i / o / u) !nucleus
+
+a <- comma* [aA] 
+
+e <- comma* [eE] 
+
+i <- comma* [iI] 
+
+o <- comma* [oO] 
+
+u <- comma* [uU] 
+
+y <- comma* [yY] 
+
+;-------------------------------------------------------------------
+
+cluster <- consonant consonant+
+
+initial-pair <- &initial consonant consonant !consonant
+
+initial <- (affricate / sibilant? other? liquid?) !consonant !glide
+
+affricate <- t c / t s / d j / d z
+
+liquid <- l / r 
+
+other <- p / t !l / k / f / x / b / d !l / g / v / m / n !liquid 
+
+sibilant <- c / s !x / (j / z) !n !liquid
+
+consonant <- voiced / unvoiced / syllabic
+
+syllabic <- l / m / n / r
+
+voiced <- b / d / g / j / v / z
+
+unvoiced <- c / f / k / p / s / t / x
+
+l <- comma* [lL] !h !l
+
+m <- comma* [mM] !h !m !z
+
+n <- comma* [nN] !h !n !affricate
+
+r <- comma* [rR] !h !r
+
+b <- comma* [bB] !h !b !unvoiced
+
+d <- comma* [dD] !h !d !unvoiced
+
+g <- comma* [gG] !h !g !unvoiced
+
+v <- comma* [vV] !h !v !unvoiced
+
+j <- comma* [jJ] !h !j !z !unvoiced
+
+z <- comma* [zZ] !h !z !j !unvoiced
+
+s <- comma* [sS] !h !s !c !voiced
+
+c <- comma* [cC] !h !c !s !x !voiced
+
+x <- comma* [xX] !h !x !c !k !voiced
+
+k <- comma* [kK] !h !k !x !voiced
+
+f <- comma* [fF] !h !f !voiced
+
+p <- comma* [pP] !h !p !voiced
+
+t <- comma* [tT] !h !t !voiced
+
+h <- comma* ['h] &nucleus
+
+;-------------------------------------------------------------------
+
+digit <- comma* [0123456789] !h !nucleus
+
+post-word <- pause / !nucleus lojban-word
+
+pause <- comma* space-char+ / EOF
+
+EOF <- comma* !.
+
+comma <- [,]
+
+non-lojban-word <- !lojban-word non-space+
+
+NORATS non-space <- !space-char .
+
+NORATS space-char <- [.\t\n\r?!\u0020]
+
+;-------------------------------------------------------------------
+
+spaces <- !Y initial-spaces
+
+initial-spaces <- (comma* space-char / !ybu Y)+ EOF? / EOF
+
+ybu <- Y space-char* BU
+
+;-------------------------------------------------------------------
+
+A <- &cmavo ( a / e / j i / o / u ) &post-word
+
+BAI <- &cmavo ( d u h o / s i h u / z a u / k i h i / d u h i / c u h u / t u h i / t i h u / d i h o / j i h u / r i h a / n i h i / m u h i / k i h u / v a h u / k o i / c a h i / t a h i / p u h e / j a h i / k a i / b a i / f i h e / d e h i / c i h o / m a u / m u h u / r i h i / r a h i / k a h a / p a h u / p a h a / l e h a / k u h u / t a i / b a u / m a h i / c i h e / f a u / p o h i / c a u / m a h e / c i h u / r a h a / p u h a / l i h e / l a h u / b a h i / k a h i / s a u / f a h e / b e h i / t i h i / j a h e / g a h a / v a h o / j i h o / m e h a / d o h e / j i h e / p i h o / g a u / z u h e / m e h e / r a i ) &post-word
+
+BAhE <- &cmavo ( b a h e / z a h e ) &post-word
+
+BE <- &cmavo ( b e ) &post-word
+
+BEI <- &cmavo ( b e i ) &post-word
+
+BEhO <- &cmavo ( b e h o ) &post-word
+
+BIhE <- &cmavo ( b i h e ) &post-word
+
+BIhI <- &cmavo ( m i h i / b i h o / b i h i ) &post-word
+
+BO <- &cmavo ( b o ) &post-word
+
+BOI <- &cmavo ( b o i ) &post-word
+
+BU <- &cmavo ( b u ) &post-word
+
+BY <- ybu / &cmavo ( j o h o / r u h o / g e h o / j e h o / l o h a / n a h a / s e h e / t o h a / g a h e / y h y /  b y / c y / d y / f y / g y / j y / k y / l y / m y / n y / p y / r y / s y / t y / v y / x y / z y ) &post-word
+
+CAhA <- &cmavo ( c a h a / p u h i / n u h o / k a h e ) &post-word
+
+CAI <- &cmavo ( p e i / c a i / c u h i / s a i / r u h e ) &post-word
+
+CEI <- &cmavo ( c e i ) &post-word
+
+CEhE <- &cmavo ( c e h e ) &post-word
+
+CO <- &cmavo ( c o ) &post-word
+
+COI <- &cmavo ( j u h i / c o i / f i h i / t a h a / m u h o / f e h o / c o h o / p e h u / k e h o / n u h e / r e h i / b e h e / j e h e / m i h e / k i h e / v i h o ) &post-word
+
+CU <- &cmavo ( c u ) &post-word
+
+CUhE <- &cmavo ( c u h e / n a u ) &post-word
+
+DAhO <- &cmavo ( d a h o ) &post-word
+
+DOI <- &cmavo ( d o i ) &post-word
+
+DOhU <- &cmavo ( d o h u ) &post-word
+
+FA <- &cmavo ( f a i / f a / f e / f o / f u / f i h a / f i ) &post-word
+
+FAhA <- &cmavo ( d u h a / b e h a / n e h u / v u h a / g a h u / t i h a / n i h a / c a h u / z u h a / r i h u / r u h u / r e h  o / t e h e / b u h u / n e h a / p a h o / n e h i / t o h o / z o h i / z e h o / z o h a / f a h a ) &post-word
+
+FAhO <- &cmavo ( f a h o ) &post-word
+
+FEhE <- &cmavo ( f e h e ) &post-word
+
+FEhU <- &cmavo ( f e h u ) &post-word
+
+FIhO <- &cmavo ( f i h o ) &post-word
+
+FOI <- &cmavo ( f o i ) &post-word
+
+FUhA <- &cmavo ( f u h a ) &post-word
+
+FUhE <- &cmavo ( f u h e ) &post-word
+
+FUhO <- &cmavo ( f u h o ) &post-word
+
+GA <- &cmavo ( g e h i / g e /  g o / g a / g u ) &post-word
+
+GAhO <- &cmavo ( k e h i / g a h o ) &post-word
+
+GEhU <- &cmavo ( g e h u ) &post-word
+
+GI <- &cmavo ( g i ) &post-word
+
+GIhA <- &cmavo ( g i h e / g i h i / g i h o / g i h a / g i h u ) &post-word
+
+GOI <- &cmavo ( n o h u / n e / g o i / p o h u / p e / p o h e / p o ) &post-word
+
+GOhA <- &cmavo ( m o / n e i / g o h u / g o h o / g o h i / n o h a / g o h e / g o h a / d u / b u h a / b u h e / b u h i / c o h  e ) &post-word
+
+GUhA <- &cmavo ( g u h e / g u h i / g u h o / g u h a / g u h u ) &post-word
+
+I <- &cmavo ( i ) &post-word
+
+JA <- &cmavo ( j e h i / j e /  j o / j a / j u ) &post-word
+
+JAI <- &cmavo ( j a i ) &post-word
+
+JOhI <- &cmavo ( j o h i ) &post-word
+
+JOI <- &cmavo ( f a h u / p i h u / j o i / c e h o / c e / j o h u / k u h a / j o h e / j u h e ) &post-word
+
+KE <- &cmavo ( k e ) &post-word
+
+KEhE <- &cmavo ( k e h e ) &post-word
+
+KEI <- &cmavo ( k e i ) &post-word
+
+KI <- &cmavo ( k i ) &post-word
+
+KOhA <- &cmavo ( d a h u / d a h e / d i h u / d i h e / d e h u / d e h e / d e i / d o h i / m i h o / m a h a / m i h a / d o h o  / k o h a / f o h u / k o h e / k o h i / k o h o / k o h u / f o h a / f o h e / f o h i / f o h o / v o h a / v o h e / v o h i /  v o h o / v o h u / r u / r i / r a / t a / t u / t i / z i h o / k e h a / m a / z u h i / z o h e / c e h u / d a / d e / d i / k  o / m i / d o ) &post-word
+
+KU <- &cmavo ( k u ) &post-word
+
+KUhE <- &cmavo ( k u h e ) &post-word
+
+KUhO <- &cmavo ( k u h o ) &post-word
+
+LA <- &cmavo ( l a i / l a h i / l a ) &post-word
+
+LAU <- &cmavo ( c e h a / l a u / z a i / t a u ) &post-word
+
+LAhE <- &cmavo ( t u h a / l u h a / l u h o / l a h e / v u h i / l u h i / l u h e ) &post-word
+
+LE <- &cmavo ( l e i / l o i / l e h i / l o h i / l e h e / l o h e / l o / l e ) &post-word
+
+LEhU <- &cmavo ( l e h u ) &post-word
+
+LI <- &cmavo ( m e h o / l i ) &post-word
+
+LIhU <- &cmavo ( l i h u ) &post-word
+
+LOhO <- &cmavo ( l o h o ) &post-word
+
+LOhU <- &cmavo ( l o h u ) &post-word
+
+LU <- &cmavo ( l u ) &post-word
+
+LUhU <- &cmavo ( l u h u ) &post-word
+
+MAhO <- &cmavo ( m a h o ) &post-word
+
+MAI <- &cmavo ( m o h o / m a i ) &post-word
+
+ME <- &cmavo ( m e ) &post-word
+
+MEhU <- &cmavo ( m e h u ) &post-word
+
+MOhE <- &cmavo ( m o h e ) &post-word
+
+MOhI <- &cmavo ( m o h i ) &post-word
+
+MOI <- &cmavo ( m e i / m o i / s i h e / c u h o / v a h e ) &post-word
+
+NA <- &cmavo ( j a h a / n a ) &post-word
+
+NAI <- &cmavo ( n a i ) &post-word
+
+NAhE <- &cmavo ( t o h e / j e h a / n a h e / n o h e ) &post-word
+
+NAhU <- &cmavo ( n a h u ) &post-word
+
+NIhE <- &cmavo ( n i h e ) &post-word
+
+NIhO <- &cmavo ( n i h o / n o h i ) &post-word
+
+NOI <- &cmavo ( v o i / n o i / p o i ) &post-word
+
+NU <- &cmavo ( n i / d u h u / s i h o / n u / l i h i / k a / j e i / s u h u / z u h o / m u h e / p u h u / z a h i ) &post-word
+
+NUhA <- &cmavo ( n u h a ) &post-word
+
+NUhI <- &cmavo ( n u h i ) &post-word
+
+NUhU <- &cmavo ( n u h u ) &post-word
+
+PA <- &cmavo ( d a u / f e i / g a i / j a u / r e i / v a i / p i h e / p i /  f i h u / z a h u / m e h i / n i h u / k i h o / c e h i / m a h u / r a h e / d a h a / s o h a / j i h i / s u h o / s u h e / r o / r a u / s o h u / s o h i / s o h e / s o h o / m o h a / d u h e / t e h o / k a h o / c i h i / t u h o / x o / p a i / n o h o / n o / p a / r e / c i / v o / m u / x a / z e / b i / s o / digit ) &post-word
+
+PEhE <- &cmavo ( p e h e ) &post-word
+
+PEhO <- &cmavo ( p e h o ) &post-word
+
+PU <- &cmavo ( b a / p u / c a ) &post-word
+
+RAhO <- &cmavo ( r a h o ) &post-word
+
+ROI <- &cmavo ( r e h u / r o i ) &post-word
+
+SA <- &cmavo ( s a ) &post-word
+
+SE <- &cmavo ( s e / t e / v e / x e ) &post-word
+
+SEI <- &cmavo ( s e i / t i h o ) &post-word
+
+SEhU <- &cmavo ( s e h u ) &post-word
+
+SI <- &cmavo ( s i ) &post-word
+
+SOI <- &cmavo ( s o i ) &post-word
+
+SU <- &cmavo ( s u ) &post-word
+
+TAhE <- &cmavo ( r u h i / t a h e / d i h i / n a h o ) &post-word
+
+TEhU <- &cmavo ( t e h u ) &post-word
+
+TEI <- &cmavo ( t e i ) &post-word
+
+TO <- &cmavo ( t o h i / t o ) &post-word
+
+TOI <- &cmavo ( t o i ) &post-word
+
+TUhE <- &cmavo ( t u h e ) &post-word
+
+TUhU <- &cmavo ( t u h u ) &post-word
+
+UI <- &cmavo ( i h a / i e / a h e / u h i / i h o / i h e / a h a / i a / o h i / o h e / e h e / o i / u o / e h i / u h o / a u /  u a / a h i / i h u / i i / u h a / u i / a h o / a i / a h u / i u / e i / o h o / e h a / u u / o h a / o h u / u h u / e h o / i  o / e h u / u e / i h i / u h e / b a h a / j a h o / c a h e / s u h a / t i h e / k a h u / s e h o / z a h a / p e h i / r u h a  / j u h a / t a h o / r a h u / l i h a / b a h u / m u h a / d o h a / t o h u / v a h i / p a h e / z u h u / s a h e / l a h a /  k e h u / s a h u / d a h i / j e h u / s a h a / k a u / t a h u / n a h i / j o h a / b i h u / l i h o / p a u / m i h u / k u h  i / j i h a / s i h a / p o h o / p e h a / r o h i / r o h e / r o h o / r o h u / r o h a / r e h e / l e h o / j u h o / f u h i  / d a i / g a h i / z o h o / b e h u / r i h e / s e h i / s e h a / v u h e / k i h a / x u / g e h e / b u h o ) &post-word
+
+VA <- &cmavo ( v i / v a / v u ) &post-word
+
+VAU <- &cmavo ( v a u ) &post-word
+
+VEI <- &cmavo ( v e i ) &post-word
+
+VEhO <- &cmavo ( v e h o ) &post-word
+
+VUhU <- &cmavo ( g e h a / f u h u / p i h i / f e h i / v u h u / s u h i / j u h u / g e i / p a h i / f a h i / t e h a / c u h a  / v a h a / n e h o / d e h o / f e h a / s a h o / r e h a / r i h o / s a h i / p i h a / s i h i ) &post-word
+
+VEhA <- &cmavo ( v e h u / v e h a / v e h i / v e h e ) &post-word
+
+VIhA <- &cmavo ( v i h i / v i h a / v i h u / v i h e ) &post-word
+
+VUhO <- &cmavo ( v u h o ) &post-word
+
+XI <- &cmavo ( x i ) &post-word
+
+Y <- &cmavo ( y+ ) &post-word
+
+ZAhO <- &cmavo ( c o h i / p u h o / c o h u / m o h u / c a h o / c o h a / d e h a / b a h o / d i h a / z a h o ) &post-word
+
+ZEhA <- &cmavo ( z e h u / z e h a / z e h i / z e h e ) &post-word
+
+ZEI <- &cmavo ( z e i ) &post-word
+
+ZI <- &cmavo ( z u / z a / z i ) &post-word
+
+ZIhE <- &cmavo ( z i h e ) &post-word
+
+ZO <- &cmavo ( z o ) &post-word
+
+ZOI <- &cmavo ( z o i / l a h o ) &post-word
+
+ZOhU <- &cmavo ( z o h u ) &post-word
